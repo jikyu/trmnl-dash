@@ -16,8 +16,9 @@ Show Claude Code, OpenAI Codex and Google Antigravity plan usage on a TRMNL Deve
  Claude Code (one per config dir) ──statusLine stdin──► claude-statusline.mjs --install <id>
         ▲                                                   │ POST /api/ingest/claude/<id>
         └──── stdout of the user's previous statusLine ◄────┤ (runs it with the same stdin)
+ claude -p /usage (fallback, per config dir) ◄──spawn──────────────────────────────────┤
  codex app-server ◄──JSON-RPC (stdio)──────────────────────────────────────────────────┤
- agy -p /usage --output-format json ◄──spawn───────────────────────────────────────────┤
+ agy -p /usage ◄──spawn────────────────────────────────────────────────────────────────┤
                                                                                        ▼
  web (Vite + React + shadcn) ──/api──► server (Hono, 127.0.0.1:8787)
                                          collect → normalize → summarize (<5 KB)
@@ -36,9 +37,9 @@ The server binds to 127.0.0.1 only. Its one secret is the TRMNL webhook URL, kep
 
 | Provider | How the server gets usage | Fields used |
 |---|---|---|
-| Claude Code | One source per installation. Claude Code runs a `statusLine` command and passes it session JSON on stdin. `claude-statusline.mjs --install <id>` forwards that JSON to `POST /api/ingest/claude/<id>`, then runs the user's previous `statusLine` command and prints its output. | `rate_limits.five_hour` and `rate_limits.seven_day`: `used_percentage`, `resets_at` (Unix seconds) |
-| OpenAI Codex | Spawn `codex app-server`, send `initialize`, then `account/rateLimits/read` over stdio JSON-RPC. Listen for `account/rateLimits/updated`. | Session and weekly windows from `GetAccountRateLimitsResponse` |
-| Antigravity | Spawn `agy -p /usage --output-format json` on the push timer, with a 90-second timeout. One reading per model group. | Each model group's windows (5-hour and weekly, to be confirmed) |
+| Claude Code | One source per installation. Claude Code runs a `statusLine` command and passes it session JSON on stdin. `claude-statusline.mjs --install <id>` forwards that JSON to `POST /api/ingest/claude/<id>`, then runs the user's previous `statusLine` command and prints its output. Falls back to `claude -p /usage`. | `rate_limits.five_hour` and `rate_limits.seven_day`: `used_percentage`, `resets_at` (Unix seconds) |
+| OpenAI Codex | Spawn `codex app-server`, send `initialize`, then `account/rateLimits/read` over stdio JSON-RPC. Listen for `account/rateLimits/updated`. | `rateLimits.primary` and `rateLimits.secondary`: `usedPercent`, `windowDurationMins`, `resetsAt` (Unix seconds). `windowDurationMins` 300 is the session window and 10080 the weekly one. `account/rateLimits/updated` carries the same `rateLimits`. |
+| Antigravity | Spawn `agy -p /usage` on the push timer, with a 90-second timeout, and parse its text report. One reading per model group. | Each model group's five-hour and weekly limits |
 
 Sign-in happens in each CLI (`claude`, `codex login`, `agy`). The dashboard only reports whether each source is working.
 
@@ -80,15 +81,20 @@ Removing an installation puts `previousCommand` back, or deletes `statusLine` wh
 
 1. Read stdin to the end.
 2. POST it to `http://127.0.0.1:8787/api/ingest/claude/<id>` with a 1-second timeout, and ignore any failure, so a stopped server never breaks the status line.
-3. If the installation has a `previousCommand`, run it in a shell with the same stdin, working directory and environment, and print its stdout. Otherwise print a short status line.
+3. If the installation has a `previousCommand`, run it in a shell with the same stdin, working directory and environment, and print its stdout. Otherwise print nothing.
+4. Ignore the previous command's stderr and exit code, and always exit 0. The forwarder adds no timeout of its own, and it runs the POST and the previous command at the same time so it adds no delay.
 
-A `statusLine` in managed settings, `--settings`, `.claude/settings.local.json` or a project's `.claude/settings.json` overrides the user-level one, and the forwarder does not run there. When an installation never reports, the Sources page says to check those.
+A `statusLine` in managed settings, `--settings`, `.claude/settings.local.json` or a project's `.claude/settings.json` overrides the user-level one, and the forwarder does not run there. This is a known edge case that the proof of concept does not handle.
+
+When an installation has had no forwarded reading since the last push, the server runs `claude -p /usage --output-format json` with that installation's `CLAUDE_CONFIG_DIR` and reads the text report in `result`. With Claude Code 2.1.332, `-p /usage` runs as a local command (`"local_command": "usage"`, no model turn, no cost). Signed out, the report holds only session token and cost lines. The docs say subscribers also see plan usage bars, so milestone 4 writes the parser from a signed-in run and drops the fallback if the bars are not in the `-p` output.
 
 `rate_limits` is only present for Pro and Max plans (Claude Code 2.1.80 or later), only after a session's first API response, and only once the user accepts workspace trust. Either window can be missing on its own. Claude usage therefore updates only while that installation is in use. When a window's `resets_at` has passed, show it as 0%. Two installations signed in to the same account report the same numbers; the plan treats them as separate rows and leaves it to the user's labels.
 
 ### Antigravity model groups
 
-Antigravity's `/usage` docs describe quota per model group, such as Gemini Pro, Gemini Flash, and the Claude and GPT models. The Antigravity source returns one reading per group, named after the group as `agy` prints it, such as "Antigravity Gemini Pro". The group names and windows are not hard-coded. The docs describe `/usage` in headless mode as a text report, and the `--output-format json` envelope's `usage` field as session token counts, not quota. The parser is written in milestone 5 from a local run's real output, which may mean parsing the report text inside the envelope's `response`.
+Antigravity's [`/usage` docs](https://antigravity.google/docs/cli/commands/usage) say the models in a group, such as Gemini Flash, Gemini Pro, or the Claude and GPT models, share a five-hour limit and a weekly limit. The Antigravity source returns one reading per group, named after the group as `agy` prints it, such as "Antigravity Gemini Pro". The group names are not hard-coded.
+
+The [headless docs](https://antigravity.google/docs/cli/headless) say `/usage` produces a text report, not JSON, so the source runs `agy -p /usage` without `--output-format` and treats a non-zero exit as a failed read. A running `agy` session does not refresh its quota, so each read spawns a new process. Milestone 5 writes the parser from a local run's real output.
 
 ## Data model
 
@@ -200,13 +206,7 @@ npm create hono@latest server   # nodejs template
 
 1. Push the sample payload with `curl` and see it on the device.
 2. Server with the TRMNL client, summary and scheduler, using fake sources.
-3. Codex source.
-4. Claude installations: the forwarder with `--install <id>` and the previous command, the ingest route, and installing and removing the forwarder in each config dir's `settings.json`.
-5. Antigravity source, one reading per model group.
+3. Codex source. The field names above come from `codex app-server generate-json-schema` in codex-cli 0.172.0.
+4. Claude installations: the forwarder with `--install <id>` and the previous command, the ingest route, installing and removing the forwarder in each config dir's `settings.json`, and the `claude -p /usage` fallback.
+5. Antigravity source, one reading per model group, parsed from a local `agy -p /usage` run.
 6. Dashboard pages.
-
-## Open questions
-
-- The exact field names in Codex's `GetAccountRateLimitsResponse`. Read them from the app-server protocol schema in milestone 3.
-- What `agy -p /usage --output-format json` prints: structured quota or a text report inside `response`, the model group names, each group's windows and reset times, and the minimum `agy` version. Check locally in milestone 5.
-- How Claude Code treats a `statusLine` command's stderr, non-zero exit and run time, which decides whether the forwarder passes through the previous command's exit code and how long it waits for it. Check locally in milestone 4.

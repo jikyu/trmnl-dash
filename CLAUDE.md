@@ -11,7 +11,7 @@ The project is a proof of concept. [docs/proof-of-concept-plan.md](./docs/proof-
 
 ## Guardrails
 
-- **Usage comes from the official CLIs only:** Claude Code's `statusLine` stdin, `codex app-server` over stdio JSON-RPC, and `agy -p /usage --output-format json`. Never read, store, or mint a provider token, and never call a provider's HTTP API, because each CLI owns its own sign-in.
+- **Usage comes from the official CLIs only:** Claude Code's `statusLine` stdin with `claude -p /usage` as a fallback, `codex app-server` over stdio JSON-RPC, and `agy -p /usage`. Never read, store, or mint a provider token, and never call a provider's HTTP API, because each CLI owns its own sign-in.
 - **The webhook URL is the one secret.** It lives in `server/data/config.json` (gitignored, mode 0600), is masked on read, and never appears in logs or responses. The server binds to `127.0.0.1` only.
 - **Stay inside TRMNL's limits:** 5 KB of merge variables and 12 pushes per hour. Push only when the summary changed, and handle 422 (too large) and 429 (rate limited) without retry loops.
 - **A failed read keeps the last good reading** and sets `ok: false`, so the device never blanks on one bad poll.
