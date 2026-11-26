@@ -1,0 +1,12 @@
+{
+ "type": "result",
+ "subtype": "success",
+ "is_error": false,
+ "duration_ms": 812,
+ "duration_api_ms": 0,
+ "num_turns": 0,
+ "total_cost_usd": 0,
+ "local_command": "usage",
+ "result": "You are currently using your subscription to power your Claude Code usage\n\nCurrent week (all models): 98% used · resets Nov 26 at 7pm (Pacific/Palau)\nCurrent week (Fable): 84% used · resets Nov 26 at 7pm (Pacific/Palau)\n\nWhat's contributing to your usage?\nApproximate · sessions on this machine only · shares overlap\n\nLast 24h · 120 requests · 2 sessions\n  80%  Start fresh when you switch tasks · run /clear\n",
+ "session_id": "00000000-0000-0000-0000-000000000000"
+}

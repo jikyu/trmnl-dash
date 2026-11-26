@@ -1,0 +1,28 @@
+<div class="layout layout--col layout--top layout--stretch-x">
+  <div class="grid grid--cols-2">
+    {% for p in providers %}
+    <div class="col">
+      <span class="title">{{ p.name }}</span>
+      {% if p.session %}
+      <div class="progress-bar">
+        <div class="content">
+          <span class="label">Session{% if p.session_reset != "" %} · resets {{ p.session_reset }}{% endif %}</span>
+          <span class="value value--xxsmall">{{ p.session }}%</span>
+        </div>
+        <div class="track"><div class="fill" style="width: {{ p.session }}%"></div></div>
+      </div>
+      {% endif %}
+      {% if p.weekly %}
+      <div class="progress-bar">
+        <div class="content">
+          <span class="label">Weekly{% if p.weekly_reset != "" %} · resets {{ p.weekly_reset }}{% endif %}</span>
+          <span class="value value--xxsmall">{{ p.weekly }}%</span>
+        </div>
+        <div class="track"><div class="fill" style="width: {{ p.weekly }}%"></div></div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<div class="title_bar"><span class="title">AI usage</span><span class="instance">{{ updated }}</span></div>

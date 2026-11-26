@@ -1,0 +1,12 @@
+{
+  "merge_variables": {
+    "updated": "Nov 26 18:40",
+    "providers": [
+      { "name": "Claude", "weekly": 61, "weekly_reset": "Mon" },
+      { "name": "Claude work", "weekly": 12, "weekly_reset": "Wed" },
+      { "name": "Codex", "session": 10, "session_reset": "21:15", "weekly": 33, "weekly_reset": "Fri" },
+      { "name": "Agi Gemini", "session": 5, "session_reset": "19:10", "weekly": 18, "weekly_reset": "Sun" },
+      { "name": "Agi Other", "session": 0, "session_reset": "", "weekly": 0, "weekly_reset": "" }
+    ]
+  }
+}
