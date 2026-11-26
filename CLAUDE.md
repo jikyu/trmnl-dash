@@ -6,7 +6,7 @@ The project is a proof of concept. [docs/proof-of-concept-plan.md](./docs/proof-
 
 ## Map
 
-- `server/`: Hono app on `127.0.0.1:8787`. `src/sources/{claude,codex,antigravity}.ts` read usage, `src/summary.ts` builds `merge_variables` and checks size, `src/trmnl.ts` posts the webhook, `src/scheduler.ts` runs the push loop, and `bin/claude-statusline.mjs` forwards Claude Code's `statusLine` JSON to `POST /api/ingest/claude`.
+- `server/`: Hono app on `127.0.0.1:8787`. `src/sources/{claude,codex,antigravity}.ts` read usage, `src/summary.ts` builds `merge_variables` and checks size, `src/trmnl.ts` posts the webhook, `src/scheduler.ts` runs the push loop, `src/claude-installs.ts` installs the forwarder in each Claude Code config dir, and `bin/claude-statusline.mjs` forwards that installation's `statusLine` JSON to `POST /api/ingest/claude/:install` and runs the user's previous `statusLine` command.
 - `web/`: the dashboard. Vite proxies `/api` to the server.
 
 ## Guardrails
